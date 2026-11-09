@@ -1,7 +1,7 @@
-import { Cinzel, Inter } from 'next/font/google';
+import { Oswald, Inter } from 'next/font/google';
 import './globals.css';
 
-const display = Cinzel({ subsets: ['latin'], weight: ['500', '700', '900'], variable: '--font-display' });
+const display = Oswald({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-display' });
 const body = Inter({ subsets: ['latin'], variable: '--font-body' });
 
 export const metadata = {

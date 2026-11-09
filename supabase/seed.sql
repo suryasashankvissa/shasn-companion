@@ -5,10 +5,10 @@
 -- =====================================================================
 
 insert into ideology_types (name, color, symbol, description, sort) values
-  ('The Capitalist',   '#d4a437', '◈', 'Markets, money and growth.',            1),
-  ('The Supremo',      '#c0453a', '▲', 'Order, strength and tradition.',         2),
-  ('The Showstopper',  '#8a5cc9', '✦', 'Spectacle, media and popularity.',      3),
-  ('The Idealist',     '#3f9e74', '❖', 'Rights, equality and the common good.', 4)
+  ('The Capitalist',   '#6fae3a', '◈', 'Markets, money and growth.',            1),
+  ('The Supremo',      '#e2483a', '▲', 'Order, strength and tradition.',         2),
+  ('The Showstopper',  '#2f43b4', '✦', 'Spectacle, media and popularity.',      3),
+  ('The Idealist',     '#e9ae22', '❖', 'Rights, equality and the common good.', 4)
 on conflict (name) do nothing;
 
 do $$

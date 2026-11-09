@@ -348,6 +348,29 @@ grant execute on function start_game(text,text)                   to service_rol
 grant execute on function answer_question(text,text,uuid,text)    to service_role;
 grant execute on function next_question(text,text)                to service_role;
 grant execute on function redraw_question(text,text)              to service_role;
+
+-- ---------- End game ----------
+
+alter table games add column if not exists winner_id uuid;
+
+create or replace function end_game(p_code text, p_token_hash text, p_winner uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare g games; me players;
+begin
+  select * into g from games where code = upper(p_code) for update;
+  if not found then raise exception 'GAME_NOT_FOUND'; end if;
+  me := _player_for(g.id, p_token_hash);
+  if not me.is_host then raise exception 'HOST_ONLY'; end if;
+  if g.status <> 'playing' then raise exception 'GAME_NOT_PLAYING'; end if;
+  if not exists (select 1 from players where id = p_winner and game_id = g.id) then
+    raise exception 'BAD_REQUEST';
+  end if;
+  update games set status = 'finished', winner_id = p_winner, updated_at = now() where id = g.id;
+end $$;
+
+revoke all on function end_game(text,text,uuid) from public, anon, authenticated;
+grant execute on function end_game(text,text,uuid) to service_role;
+
 -- =====================================================================
 -- Starter content: the four base ideologues and an original sample deck
 -- so you can try the app straight away. Safe to re-run.
@@ -355,10 +378,10 @@ grant execute on function redraw_question(text,text)              to service_rol
 -- =====================================================================
 
 insert into ideology_types (name, color, symbol, description, sort) values
-  ('The Capitalist',   '#d4a437', '◈', 'Markets, money and growth.',            1),
-  ('The Supremo',      '#c0453a', '▲', 'Order, strength and tradition.',         2),
-  ('The Showstopper',  '#8a5cc9', '✦', 'Spectacle, media and popularity.',      3),
-  ('The Idealist',     '#3f9e74', '❖', 'Rights, equality and the common good.', 4)
+  ('The Capitalist',   '#6fae3a', '◈', 'Markets, money and growth.',            1),
+  ('The Supremo',      '#e2483a', '▲', 'Order, strength and tradition.',         2),
+  ('The Showstopper',  '#2f43b4', '✦', 'Spectacle, media and popularity.',      3),
+  ('The Idealist',     '#e9ae22', '❖', 'Rights, equality and the common good.', 4)
 on conflict (name) do nothing;
 
 do $$

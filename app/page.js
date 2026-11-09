@@ -10,11 +10,8 @@ export default function Home() {
   return (
     <main className="page narrow">
       <section className="hero">
-        <div className="crest">CC</div>
-        <p className="eyebrow">A companion for Shasn</p>
-        <h1 style={{ marginTop: 10 }}>
-          Campaign <span>Companion</span>
-        </h1>
+        <img src="/logo.png" alt="SHASN — What will you stand for?" className="logo-hero" />
+        <p className="eyebrow">Campaign Companion</p>
         <p className="muted" style={{ marginTop: 12 }}>
           Draw campaign questions, reveal ideologies and track every player&apos;s collection — while you play on the
           real board.

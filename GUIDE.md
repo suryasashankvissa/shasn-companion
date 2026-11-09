@@ -86,3 +86,10 @@ Questions outlined in red are incomplete (missing text or an ideology) and are s
 | `supabase/schema.sql` | Database tables **and all game rules** (whose turn, one answer only, host-only) |
 | `supabase/seed.sql` | Starter ideologues and sample deck |
 | `tests/` | Automated multiplayer test |
+
+## New in this version
+- **Resource coins** appear on every revealed ideology card (write resources like `2 Funds, 1 Media`; words: Funds, Clout, Media, Trust).
+- **Tap a collection chip** (e.g. "Capitalist: 2") to see the cards behind it.
+- **End this game** (host): at the bottom of the question screen -> pick who won -> confetti for everyone.
+  This needs a one-time database update: run `supabase/migration-end-game.sql` in Supabase > SQL Editor.
+- **India 2026 Campaign**: `test-decks/India 2026 Campaign.csv`, import it from Admin > Import from file.

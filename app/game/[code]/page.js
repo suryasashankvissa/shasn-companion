@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getToken, hasToken, supabase, rememberGame } from '@/lib/client';
 import DeckSwatch from '@/components/DeckSwatch';
+import { CardFace, Resources } from '@/components/Coins';
 
 export default function GamePage() {
   const { code: rawCode } = useParams();
@@ -96,6 +97,8 @@ export default function GamePage() {
     <>
       {state.status === 'lobby' ? (
         <Lobby state={state} act={act} live={live} />
+      ) : state.status === 'finished' ? (
+        <Finished state={state} />
       ) : (
         <Gameplay state={state} act={act} live={live} />
       )}
@@ -315,6 +318,7 @@ function Gameplay({ state, act, live }) {
               ) : (
                 <button className="btn ghost sm" onClick={() => setConfirmRedraw(true)}>Redraw this card</button>
               )}
+              <EndGame state={state} act={act} busy={busy} />
               <p className="muted small center">You are the host — only you can move the game forward.</p>
             </div>
           )}
@@ -328,6 +332,95 @@ function Gameplay({ state, act, live }) {
           <Collections state={state} />
         </section>
       </div>
+    </main>
+  );
+}
+
+function EndGame({ state, act, busy }) {
+  const [step, setStep] = useState(0); // 0 button, 1 pick winner
+  const [winner, setWinner] = useState(null);
+  const [working, setWorking] = useState(false);
+  if (step === 0) {
+    return <button className="btn ghost sm" onClick={() => setStep(1)}>End this game</button>;
+  }
+  return (
+    <div className="notice stack">
+      <h3>Who won?</h3>
+      <p className="small">The real win happens on the board. Pick the winner and everyone will see the celebration.</p>
+      <div className="winner-grid">
+        {state.players.map((p) => (
+          <button key={p.id} className={`btn ${winner === p.id ? 'primary' : ''}`} onClick={() => setWinner(p.id)}>
+            {p.name}
+          </button>
+        ))}
+      </div>
+      <div className="row">
+        <button
+          className="btn primary"
+          disabled={!winner || working || busy}
+          onClick={async () => {
+            setWorking(true);
+            const ok = await act('end', { winnerId: winner });
+            if (!ok) setWorking(false);
+          }}
+        >
+          {working ? 'Ending…' : 'Confirm winner'}
+        </button>
+        <button className="btn ghost" onClick={() => { setStep(0); setWinner(null); }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function Finished({ state }) {
+  const winner = state.players.find((p) => p.id === state.winnerId);
+  const youWon = winner?.id === state.me.id;
+  const canvasRef = useRef(null);
+  const [tab, setTab] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    let w = (cv.width = window.innerWidth);
+    let h = (cv.height = window.innerHeight);
+    const colors = ['#e2483a', '#2f43b4', '#e9ae22', '#6fae3a', '#f4ecd8'];
+    const bits = Array.from({ length: 160 }, () => ({
+      x: Math.random() * w, y: -20 - Math.random() * h * 0.6,
+      vx: (Math.random() - 0.5) * 2.5, vy: 2 + Math.random() * 4,
+      s: 6 + Math.random() * 8, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3,
+      c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    let raf;
+    const t0 = performance.now();
+    const tick = (t) => {
+      ctx.clearRect(0, 0, w, h);
+      for (const b of bits) {
+        b.x += b.vx; b.y += b.vy; b.r += b.vr;
+        if (b.y > h + 20 && t - t0 < 7000) { b.y = -20; b.x = Math.random() * w; }
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+        ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 3, b.s, b.s * 0.6); ctx.restore();
+      }
+      if (t - t0 < 9000) raf = requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, w, h);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <main className="page narrow stack center">
+      <canvas ref={canvasRef} className="confetti" aria-hidden="true" />
+      <img src="/logo.png" alt="SHASN" className="logo-sm" />
+      <p className="eyebrow">Game over</p>
+      <h1 className="win-title">{youWon ? 'You won!' : `${winner?.name || 'Someone'} won!`}</h1>
+      <p className="display" style={{ fontSize: '1.2rem' }}>
+        🎉 Congratulations{youWon ? '!' : `, ${winner?.name}!`} 🎉
+      </p>
+      <p className="muted">A well-earned victory on the board. Thanks for playing SHASN.</p>
+      <button className="btn" onClick={() => setTab((t) => !t)}>{tab ? 'Hide final collections' : 'See final collections'}</button>
+      {tab && <div style={{ textAlign: 'left' }}><Collections state={state} /></div>}
+      <Link href="/" className="btn primary block">Back to home</Link>
     </main>
   );
 }
@@ -404,24 +497,21 @@ function IdeologyCard({ result, playerById, meId }) {
   const answerer = playerById[result.answererId];
   return (
     <div className="reveal-wrap">
-      <div className="ideo-card" style={{ '--ideo': c.ideology_color }}>
-        <p className="eyebrow" style={{ color: 'rgba(255,255,255,.8)' }}>Ideology revealed</p>
-        <div className="ideo-symbol" style={{ marginTop: 10 }}>{c.ideology_symbol}</div>
-        <div className="ideo-name">{c.ideology_name}</div>
-        {c.ideology_description && <p className="small" style={{ opacity: 0.85 }}>{c.ideology_description}</p>}
-        {c.card_text && <p className="ideo-text">“{c.card_text}”</p>}
-        {c.resources && <span className="ideo-res">Collect on the board: {c.resources}</span>}
-        <p className="ideo-award">
-          Awarded to <strong>{recipient?.id === meId ? 'you' : recipient?.name}</strong>
-          {recipient?.id !== answerer?.id && <> (answered by {answerer?.name})</>}
-        </p>
+      <p className="eyebrow center" style={{ marginBottom: 8 }}>Ideology revealed</p>
+      <div className="flip">
+        <CardFace card={c} />
       </div>
+      <p className="ideo-award">
+        Awarded to <strong>{recipient?.id === meId ? 'you' : recipient?.name}</strong>
+        {recipient?.id !== answerer?.id && <> (answered by {answerer?.name})</>}
+      </p>
     </div>
   );
 }
 
 function Collections({ state }) {
   const [flashId, setFlashId] = useState(null);
+  const [open, setOpen] = useState({}); // "playerId|ideologyKey" -> true
   const lastSeq = useRef(null);
   useEffect(() => {
     const key = state.result ? `${state.questionSeq}` : null;
@@ -454,14 +544,33 @@ function Collections({ state }) {
                   <span className="coll-total">{total} card{total === 1 ? '' : 's'}</span>
                 </div>
                 {owned.length ? (
-                  <div className="chips">
-                    {owned.map((t) => (
-                      <span key={t.id} className="chip" style={{ '--ideo': t.color }} title={t.name}>
-                        <span className="sym">{t.symbol}</span>
-                        {t.name.replace(/^The /, '')}: <b>{counts[t.id]}</b>
-                      </span>
+                  <>
+                    <div className="chips">
+                      {owned.map((t) => {
+                        const k = `${p.id}|${t.id}`;
+                        return (
+                          <button
+                            key={t.id}
+                            className={`chip ${open[k] ? 'open' : ''}`}
+                            style={{ '--ideo': t.color }}
+                            aria-expanded={!!open[k]}
+                            onClick={() => setOpen((o) => ({ ...o, [k]: !o[k] }))}
+                          >
+                            <span className="sym">{t.symbol}</span>
+                            {t.name.replace(/^The /, '')}: <b>{counts[t.id]}</b>
+                            <span className="chev">{open[k] ? '▴' : '▾'}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {owned.filter((t) => open[`${p.id}|${t.id}`]).map((t) => (
+                      <div key={t.id} className="card-rail" style={{ '--ideo': t.color }}>
+                        {(state.cards?.[p.id] || []).filter((c) => c.key === t.id).map((c) => (
+                          <CardFace key={c.seq} card={c.card} number={null} small />
+                        ))}
+                      </div>
                     ))}
-                  </div>
+                  </>
                 ) : (
                   <p className="muted small">No ideology cards yet.</p>
                 )}

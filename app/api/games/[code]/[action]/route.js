@@ -49,6 +49,10 @@ export async function POST(request, { params }) {
         await rpc('redraw_question', { p_code: code, p_token_hash: tokenHash });
         break;
 
+      case 'end':
+        await rpc('end_game', { p_code: code, p_token_hash: tokenHash, p_winner: String(body.winnerId || '') });
+        break;
+
       default:
         throw new AppError('BAD_REQUEST', 404);
     }
