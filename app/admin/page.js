@@ -47,6 +47,7 @@ function Dashboard() {
         <h1>Campaign Decks</h1>
         <div className="row">
           <Link href="/admin/ideologies" className="btn">Ideology types</Link>
+          <Link href="/admin/import" className="btn">Import from file</Link>
           <button className="btn primary" onClick={createDeck}>+ New deck</button>
         </div>
       </div>
