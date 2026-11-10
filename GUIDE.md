@@ -93,3 +93,17 @@ Questions outlined in red are incomplete (missing text or an ideology) and are s
 - **End this game** (host): at the bottom of the question screen -> pick who won -> confetti for everyone.
   This needs a one-time database update: run `supabase/migration-end-game.sql` in Supabase > SQL Editor.
 - **India 2026 Campaign**: `test-decks/India 2026 Campaign.csv`, import it from Admin > Import from file.
+
+## New: printed-card design and answer texts
+- Questions now look like the real SHASN cards: black lattice top, cream body, and a coloured band with a plaque at the bottom.
+- While answering, both the Yes and No texts are shown so you can read them aloud. The band stays grey with "?" until the answer is given; then it flips to show the ideology.
+- Stored cards in the collections use the same design.
+- A red "!!" badge marks sensitive questions. Tick "Sensitive topic" in the deck editor, or use the `sensitive` column (yes/no) in a CSV.
+- Before using this, run `supabase/migration-card-design.sql` in the Supabase SQL Editor (and `migration-end-game.sql` if you haven't).
+
+## New: Ideologue powers and the Jumla card
+- **Resources box:** after each answer the app lists what to take from the reserve: the coins on the card plus passive bonuses (+1 resource of an Ideologue's type for every 2 of their cards, counting the new card).
+- **Powers:** the Collections & Powers tab shows each player's passive bonus and any Level 3 or Level 5 power (tap one to read it). It also shows how many more cards you need. An "Ideologue powers guide" with the full table from the rulebook sits at the bottom.
+- **Unlock alarm:** when anyone reaches 3 or 5 cards of one Ideologue, every phone shows a "Power unlocked" pop-up with a chime and vibration.
+- **Jumla card:** tap "I got the Jumla card" and pick an Ideologue; it counts as one extra card there. The holder can move it on their own turn or discard it. Another player can ask to take it. The price is the level it sits on (how many cards of that Ideologue the holder has, Jumla included). The holder taps "Accept — I got paid" after receiving the resources.
+- Before using the Jumla card, run `supabase/migration-powers-jumla.sql` in the Supabase SQL Editor.

@@ -53,6 +53,15 @@ export async function POST(request, { params }) {
         await rpc('end_game', { p_code: code, p_token_hash: tokenHash, p_winner: String(body.winnerId || '') });
         break;
 
+      case 'jumla':
+        await rpc('jumla', {
+          p_code: code,
+          p_token_hash: tokenHash,
+          p_action: String(body.jumlaAction || ''),
+          p_ideology: body.ideologyId ? String(body.ideologyId) : null,
+        });
+        break;
+
       default:
         throw new AppError('BAD_REQUEST', 404);
     }
@@ -63,6 +72,7 @@ export async function POST(request, { params }) {
     const msg = String(e.message || '');
     if (msg.includes('invalid input syntax for type uuid')) return errorResponse(new AppError('QUESTION_CHANGED'));
     if (msg.includes('turns_game_id_seq_key')) return errorResponse(new AppError('ALREADY_ANSWERED'));
+    if (msg.includes('Could not find the function') || msg.includes('does not exist')) return errorResponse(new AppError('NEEDS_DB_UPDATE'));
     if (msg.includes('players_unique_name') || msg.includes('players_game_id_seat_key')) return errorResponse(new AppError('NAME_TAKEN'));
     return errorResponse(e);
   }

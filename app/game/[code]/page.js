@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getToken, hasToken, supabase, rememberGame } from '@/lib/client';
 import DeckSwatch from '@/components/DeckSwatch';
-import { CardFace, PCard } from '@/components/Coins';
+import { CardFace, PCard, Coin } from '@/components/Coins';
+import { POWERS, powerKey, playerPowers, passiveBonus, milestones, effectiveCounts } from '@/lib/powers';
 
 export default function GamePage() {
   const { code: rawCode } = useParams();
@@ -252,9 +253,12 @@ function Gameplay({ state, act, live }) {
         <TurnStrip players={state.players} activeId={state.activePlayerId} meId={state.me.id} />
       </header>
 
+      <UnlockAlarm state={state} />
+      <JumlaRequestBanner state={state} act={act} />
+
       <div className="tabs">
         <button className={`btn sm ${tab === 'question' ? 'selected' : ''}`} onClick={() => setTab('question')}>Campaign Question</button>
-        <button className={`btn sm ${tab === 'collections' ? 'selected' : ''}`} onClick={() => setTab('collections')}>Ideology Collections</button>
+        <button className={`btn sm ${tab === 'collections' ? 'selected' : ''}`} onClick={() => setTab('collections')}>Collections &amp; Powers</button>
       </div>
 
       <div className="game-grid">
@@ -291,6 +295,8 @@ function Gameplay({ state, act, live }) {
           ) : (
             <p className="notice">No question available. The deck may be empty.</p>
           )}
+
+          {answered && <TurnResources state={state} />}
 
           {answered ? (
             <p className="ideo-award">
@@ -329,7 +335,9 @@ function Gameplay({ state, act, live }) {
 
         {/* Section B: Ideology Collection */}
         <section className="tab-panel stack" style={{ display: tab === 'collections' ? 'block' : 'none' }}>
+          <JumlaPanel state={state} act={act} />
           <Collections state={state} />
+          <PowersGuide />
         </section>
       </div>
     </main>
@@ -518,8 +526,9 @@ function Collections({ state }) {
         <h2 style={{ marginBottom: 12 }}>Ideology Collections</h2>
         <div className="coll-list">
           {state.players.map((p) => {
-            const counts = state.collections[p.id] || {};
+            const counts = effectiveCounts(state, p.id);
             const total = Object.values(counts).reduce((a, b) => a + b, 0);
+            const jumlaHere = state.jumla?.holderId === p.id ? state.jumla.ideologyId : null;
             const owned = types.filter((t) => counts[t.id]);
             return (
               <div key={p.id} className={`coll ${p.id === state.me.id ? 'me' : ''} ${flashId === p.id ? 'flash' : ''}`}>
@@ -544,6 +553,7 @@ function Collections({ state }) {
                           >
                             <span className="sym">{t.symbol}</span>
                             {t.name.replace(/^The /, '')}: <b>{counts[t.id]}</b>
+                            {jumlaHere === t.id && <span className="jumla-mini" title="Includes the Jumla card">J</span>}
                             <span className="chev">{open[k] ? '▴' : '▾'}</span>
                           </button>
                         );
@@ -554,12 +564,14 @@ function Collections({ state }) {
                         {(state.cards?.[p.id] || []).filter((c) => c.key === t.id).map((c) => (
                           <CardFace key={c.seq} card={c.card} number={null} small />
                         ))}
+                        {jumlaHere === t.id && <JumlaCard small ideology={t} />}
                       </div>
                     ))}
                   </>
                 ) : (
                   <p className="muted small">No ideology cards yet.</p>
                 )}
+                <UnlockedPowers state={state} playerId={p.id} />
               </div>
             );
           })}
@@ -584,5 +596,374 @@ function Collections({ state }) {
         </div>
       )}
     </>
+  );
+}
+
+/* ------------------------ Ideologue powers ------------------------ */
+
+const LEVEL_LABEL = { 3: 'Level 3', 5: 'Level 5' };
+
+// Resources the player collects this turn: the card's printed coins plus passive Ideologue bonuses.
+function TurnResources({ state }) {
+  const r = state.result;
+  if (!r) return null;
+  const name = (id) => (id === state.me.id ? 'You' : state.players.find((p) => p.id === id)?.name || '');
+  const bonus = passiveBonus(state, r.answererId);
+  const printed = r.card?.resources || '';
+  const same = r.recipientId === r.answererId;
+  const bonusTotal = bonus.reduce((a, b) => a + b.n, 0);
+  if (!printed && !bonusTotal) return null;
+  return (
+    <div className="turn-res panel">
+      <h3>Resources to take from the reserve</h3>
+      {printed && (
+        <div className="tr-row">
+          <span className="tr-label">{same ? `${name(r.answererId)} · from the card` : `${name(r.recipientId)} · from the card`}</span>
+          <ResourceLine text={printed} />
+        </div>
+      )}
+      {bonusTotal > 0 && (
+        <div className="tr-row">
+          <span className="tr-label">{name(r.answererId)} · passive powers</span>
+          <span className="tr-coins">
+            {bonus.map((b) => (
+              <span key={b.kind} className="tr-item">{b.n}× <Coin kind={b.kind} size={22} /> <small>{b.name}</small></span>
+            ))}
+          </span>
+        </div>
+      )}
+      {same && (
+        <p className="tr-total">
+          Total for {name(r.answererId) === 'You' ? 'you' : name(r.answererId)}: <b>{totalLine(printed, bonus)}</b>
+        </p>
+      )}
+      <p className="muted small">Passive power: +1 resource of an Ideologue&apos;s type for every 2 of their cards held (this card included).</p>
+    </div>
+  );
+}
+
+function parseCoins(text) {
+  const out = {};
+  for (const part of String(text || '').split(/[,;+&]/)) {
+    const m = part.trim().match(/^(\d+)?\s*(?:x\s*)?(?:campaign\s+|street\s+|media\s+|public\s+)?(funds?|clout|media|trust)\b/i);
+    if (m) {
+      const k = m[2].toLowerCase().replace(/^funds?$/, 'funds');
+      out[k] = (out[k] || 0) + Number(m[1] || 1);
+    }
+  }
+  return out;
+}
+const RES_NAMES = { funds: 'Funds', clout: 'Clout', media: 'Media', trust: 'Trust' };
+function totalLine(printed, bonus) {
+  const t = parseCoins(printed);
+  for (const b of bonus) t[b.kind] = (t[b.kind] || 0) + b.n;
+  const parts = Object.keys(RES_NAMES).filter((k) => t[k]).map((k) => `${t[k]} ${RES_NAMES[k]}`);
+  return parts.join(' + ') || '—';
+}
+function ResourceLine({ text }) {
+  const t = parseCoins(text);
+  const keys = Object.keys(RES_NAMES).filter((k) => t[k]);
+  if (!keys.length) return <span className="tr-coins">{text}</span>;
+  return (
+    <span className="tr-coins">
+      {keys.map((k) => (
+        <span key={k} className="tr-item">{t[k]}× <Coin kind={k} size={22} /> <small>{RES_NAMES[k]}</small></span>
+      ))}
+    </span>
+  );
+}
+
+// Badges under each player in the collections: what they have unlocked (and, for you, what's next).
+function UnlockedPowers({ state, playerId }) {
+  const list = playerPowers(state, playerId).filter((x) => x.power);
+  const on = list.filter((x) => x.passive || x.level3);
+  const mine = playerId === state.me.id;
+  const next = mine
+    ? list
+        .map((x) => (x.count < 3 ? { x, need: 3 - x.count, lvl: 3 } : x.count < 5 ? { x, need: 5 - x.count, lvl: 5 } : null))
+        .filter((n) => n && n.x.count > 0)
+    : [];
+  if (!on.length && !next.length) return null;
+  return (
+    <div className="powers">
+      {on.map((x) => (
+        <div key={x.type.id} className="pw" style={{ '--ideo': x.type.color }}>
+          <span className="pw-name">{x.type.name.replace(/^The /, '')}</span>
+          {x.passive > 0 && (
+            <span className="pw-tag">Passive +{x.passive} <Coin kind={x.power.resource} size={16} /> / turn</span>
+          )}
+          {x.level3 && <PowerTag lvl={3} p={x.power.l3} />}
+          {x.level5 && <PowerTag lvl={5} p={x.power.l5} />}
+        </div>
+      ))}
+      {next.map(({ x, need, lvl }) => (
+        <p key={x.type.id} className="pw-next">
+          {need} more {x.type.name.replace(/^The /, '')} card{need === 1 ? '' : 's'} unlocks {LEVEL_LABEL[lvl]}: {x.power[`l${lvl}`].name}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function PowerTag({ lvl, p }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button className={`pw-tag lvl ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      L{lvl} · {p.name}
+      {open && <span className="pw-desc">{p.text}</span>}
+    </button>
+  );
+}
+
+// The full reference table from the rulebook.
+function PowersGuide() {
+  const rows = Object.entries(POWERS);
+  return (
+    <details className="panel guide">
+      <summary><h3 style={{ display: 'inline' }}>Ideologue powers guide</h3></summary>
+      <p className="muted small" style={{ margin: '8px 0 12px' }}>
+        Powers stay active as long as you hold enough cards, can be used in the same turn they unlock, and stack with each other.
+        The Jumla card counts as one extra card of the Ideologue it sits under.
+      </p>
+      <div className="guide-grid">
+        {rows.map(([k, p]) => (
+          <div key={k} className="guide-col">
+            <h4>The {k[0].toUpperCase() + k.slice(1)}</h4>
+            <p><b>Passive</b> · 1 <Coin kind={p.resource} size={16} /> {p.resourceName} for every 2 cards</p>
+            <p><b>Level 3 · {p.l3.name}</b><br />{p.l3.text}</p>
+            <p><b>Level 5 · {p.l5.name}</b><br />{p.l5.text}</p>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+// Pops up on every phone the moment any player reaches 3 or 5 cards of an Ideologue.
+function UnlockAlarm({ state }) {
+  const seen = useRef(null);
+  const [alerts, setAlerts] = useState([]);
+  useEffect(() => {
+    const now = milestones(state);
+    if (seen.current) {
+      const fresh = [...now].filter((m) => !seen.current.has(m));
+      if (fresh.length) {
+        const items = fresh.map((m) => {
+          const [pid, tid, lvl] = m.split('|');
+          const t = state.ideologies.find((i) => i.id === tid);
+          const p = POWERS[powerKey(t)];
+          return {
+            id: m,
+            who: pid === state.me.id ? 'You' : state.players.find((x) => x.id === pid)?.name,
+            mine: pid === state.me.id,
+            ideo: t,
+            lvl: Number(lvl),
+            power: p?.[`l${lvl}`],
+          };
+        });
+        setAlerts((a) => [...a, ...items]);
+        try { navigator.vibrate?.([120, 60, 120]); } catch {}
+        chime();
+      }
+    }
+    seen.current = now;
+  }, [state]);
+  if (!alerts.length) return null;
+  const a = alerts[0];
+  return (
+    <div className="unlock-overlay" role="alertdialog" aria-live="assertive" onClick={() => setAlerts((x) => x.slice(1))}>
+      <div className="unlock-box" style={{ '--ideo': a.ideo?.color }} onClick={(e) => e.stopPropagation()}>
+        <p className="eyebrow">Power unlocked</p>
+        <h2>{a.ideo?.name} · {LEVEL_LABEL[a.lvl]}</h2>
+        <p className="unlock-who">{a.mine ? 'You have' : `${a.who} has`} {a.lvl} {a.ideo?.name.replace(/^The /, '')} cards</p>
+        {a.power && (
+          <>
+            <h3>{a.power.name}</h3>
+            <p>{a.power.text}</p>
+          </>
+        )}
+        <button className="btn primary block" onClick={() => setAlerts((x) => x.slice(1))}>
+          {alerts.length > 1 ? `Got it (${alerts.length - 1} more)` : 'Got it'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function chime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [660, 880, 1320].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = f;
+      o.type = 'triangle';
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.12 + 0.35);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + i * 0.12);
+      o.stop(ctx.currentTime + i * 0.12 + 0.4);
+    });
+    setTimeout(() => ctx.close(), 1200);
+  } catch {}
+}
+
+/* ---------------------------- Jumla card --------------------------- */
+
+const JUMLA_QUOTE = "You're not telling lies. You're just telling the people what they want to hear.";
+const JUMLA_TEXT =
+  'This is an extra Ideology Card of your choice. Opponents can take this card by paying you as many resources as the Ideologue level this card is on. At the end of your turn, you may place this card under a different Ideologue.';
+
+function JumlaCard({ ideology, small }) {
+  return (
+    <div className={`jcard ${small ? 'small' : ''}`} style={{ '--ideo': ideology?.color || '#8a8f98' }}>
+      <div className="j-plaque">Jumla</div>
+      <p className="j-quote">{JUMLA_QUOTE}</p>
+      {!small && <p className="j-text">{JUMLA_TEXT}</p>}
+      <div className="j-band">{ideology ? `Under ${ideology.name}` : 'Not placed yet'}</div>
+    </div>
+  );
+}
+
+// Ideologues the Jumla card can sit under (the four base ones, plus any custom types).
+function IdeologyPicker({ state, value, onPick, exclude }) {
+  return (
+    <div className="ideo-pick">
+      {state.ideologies.filter((t) => t.id !== exclude).map((t) => (
+        <button key={t.id} className={`chip ${value === t.id ? 'open' : ''}`} style={{ '--ideo': t.color }} onClick={() => onPick(t.id)}>
+          <span className="sym">{t.symbol}</span>
+          {t.name.replace(/^The /, '')}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function JumlaPanel({ state, act }) {
+  const j = state.jumla || {};
+  const [mode, setMode] = useState(null); // 'claim' | 'move' | 'request' | 'discard'
+  const [pick, setPick] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const name = (id) => state.players.find((p) => p.id === id)?.name || '';
+  const ideo = (id) => state.ideologies.find((t) => t.id === id);
+  const meId = state.me.id;
+  const isMyTurn = state.activePlayerId === meId;
+
+  async function run(jumlaAction, ideologyId) {
+    setBusy(true);
+    const ok = await act('jumla', { jumlaAction, ideologyId });
+    setBusy(false);
+    if (ok) { setMode(null); setPick(null); }
+  }
+
+  if (!j.enabled) {
+    return (
+      <div className="panel jumla-panel">
+        <h3>Jumla card</h3>
+        <p className="muted small">The Jumla card needs a one-time database update (supabase/migration-powers-jumla.sql).</p>
+      </div>
+    );
+  }
+
+  const holder = j.holderId;
+  const under = ideo(j.ideologyId);
+  const price = holder ? (effectiveCounts(state, holder)[j.ideologyId] || 1) : 0;
+  const chooser = (label, action, exclude) => (
+    <div className="stack" style={{ gap: 10 }}>
+      <p className="small">{label}</p>
+      <IdeologyPicker state={state} value={pick} onPick={setPick} exclude={exclude} />
+      <div className="row">
+        <button className="btn primary" disabled={!pick || busy} onClick={() => run(action, pick)}>Confirm</button>
+        <button className="btn ghost" onClick={() => { setMode(null); setPick(null); }}>Cancel</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="panel jumla-panel stack">
+      <div className="spread">
+        <h3>Jumla card</h3>
+        {holder && <span className="tag">{holder === meId ? 'You hold it' : `Held by ${name(holder)}`}</span>}
+      </div>
+
+      {!holder && (
+        mode === 'claim'
+          ? chooser('Which Ideologue do you want to place it under? It counts as one extra card there.', 'claim')
+          : (
+            <>
+              <p className="muted small">Drew the Jumla card from the Conspiracy deck? Add it to your collection here.</p>
+              <button className="btn" onClick={() => setMode('claim')}>I got the Jumla card</button>
+            </>
+          )
+      )}
+
+      {holder && <JumlaCard ideology={under} />}
+
+      {holder && (
+        <p className="small center">
+          Sits under <b>{under?.name}</b> at level <b>{price}</b>, so taking it costs <b>{price} resource{price === 1 ? '' : 's'}</b> paid to {holder === meId ? 'you' : name(holder)}.
+        </p>
+      )}
+
+      {holder === meId && !j.buyerId && (
+        mode === 'move' ? chooser('Move it under which Ideologue?', 'move', j.ideologyId)
+        : mode === 'discard' ? (
+          <div className="notice stack">
+            <p>Return the Jumla card to the box? It will leave your collection.</p>
+            <div className="row">
+              <button className="btn danger" disabled={busy} onClick={() => run('discard')}>Yes, discard</button>
+              <button className="btn ghost" onClick={() => setMode(null)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="row">
+            <button className="btn sm" disabled={!isMyTurn} onClick={() => setMode('move')}>Move to another Ideologue</button>
+            <button className="btn ghost sm" onClick={() => setMode('discard')}>Discard</button>
+            {!isMyTurn && <span className="muted small">You can move it at the end of your turn.</span>}
+          </div>
+        )
+      )}
+
+      {holder && holder !== meId && !j.buyerId && (
+        mode === 'request'
+          ? chooser(`If ${name(holder)} agrees, you pay them ${price} resource${price === 1 ? '' : 's'}. Where will you place it?`, 'request')
+          : <button className="btn" onClick={() => setMode('request')}>Ask to take it ({price} resource{price === 1 ? '' : 's'})</button>
+      )}
+
+      {j.buyerId === meId && (
+        <div className="notice stack">
+          <p>Waiting for {name(holder)} to agree. Hand over <b>{j.price} resource{j.price === 1 ? '' : 's'}</b> on the table; they accept once they have them.</p>
+          <button className="btn ghost sm" disabled={busy} onClick={() => run('cancel')}>Withdraw request</button>
+        </div>
+      )}
+      {j.buyerId && j.buyerId !== meId && holder !== meId && (
+        <p className="muted small">{name(j.buyerId)} has asked {name(holder)} for the Jumla card.</p>
+      )}
+    </div>
+  );
+}
+
+// Shown at the top for the holder whenever someone asks for the card: both players must agree.
+function JumlaRequestBanner({ state, act }) {
+  const j = state.jumla || {};
+  const [busy, setBusy] = useState(false);
+  if (!j.buyerId || j.holderId !== state.me.id) return null;
+  const buyer = state.players.find((p) => p.id === j.buyerId)?.name;
+  const to = state.ideologies.find((t) => t.id === j.buyerIdeologyId)?.name;
+  const go = async (a) => { setBusy(true); await act('jumla', { jumlaAction: a }); setBusy(false); };
+  return (
+    <div className="jumla-req">
+      <p>
+        <b>{buyer}</b> wants your Jumla card (to place under {to}) for <b>{j.price} resource{j.price === 1 ? '' : 's'}</b>.
+        Accept only once you have received them.
+      </p>
+      <div className="row">
+        <button className="btn primary sm" disabled={busy} onClick={() => go('accept')}>Accept — I got paid</button>
+        <button className="btn ghost sm" disabled={busy} onClick={() => go('decline')}>Decline</button>
+      </div>
+    </div>
   );
 }

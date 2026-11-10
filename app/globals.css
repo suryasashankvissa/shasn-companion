@@ -312,3 +312,48 @@ input[type=color] { padding: 4px; width: 56px; }
 .winner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .win-title { font-size: clamp(2.4rem, 12vw, 3.6rem); color: var(--brass-2); }
 .confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
+
+/* ---------- Ideologue powers ---------- */
+.turn-res { margin-top: 14px; display: grid; gap: 10px; }
+.turn-res h3 { font-size: 1rem; }
+.tr-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.tr-label { font-size: .88rem; color: var(--muted); }
+.tr-coins { display: inline-flex; flex-wrap: wrap; gap: 10px; }
+.tr-item { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.tr-item small { font-weight: 400; color: var(--muted); }
+.tr-total { font-size: 1rem; border-top: 1px solid var(--line); padding-top: 8px; }
+.tr-total b { color: var(--brass-2); }
+.powers { display: grid; gap: 6px; margin-top: 10px; }
+.pw { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-left: 3px solid var(--ideo); padding-left: 8px; }
+.pw-name { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; font-size: .78rem; min-width: 84px; }
+.pw-tag { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--text); }
+.pw-tag.lvl { cursor: pointer; border-color: var(--ideo); background: color-mix(in srgb, var(--ideo) 22%, transparent); flex-wrap: wrap; text-align: left; font: inherit; font-size: .78rem; }
+.pw-tag.lvl.open { border-radius: 10px; }
+.pw-desc { display: block; width: 100%; font-size: .8rem; color: var(--muted); padding: 4px 0 2px; }
+.pw-next { font-size: .78rem; color: var(--muted); }
+.guide summary { cursor: pointer; }
+.guide-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.guide-col { border-top: 3px solid var(--line); padding-top: 8px; display: grid; gap: 8px; font-size: .86rem; }
+.guide-col h4 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; }
+.guide-col:nth-child(1) { border-color: #6fae3a; } .guide-col:nth-child(2) { border-color: #e2483a; }
+.guide-col:nth-child(3) { border-color: #2f43b4; } .guide-col:nth-child(4) { border-color: #e9ae22; }
+.unlock-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.7); display: grid; place-items: center; padding: 20px; animation: fadeIn .2s; }
+.unlock-box { background: #151616; border: 2px solid var(--ideo); border-radius: 16px; padding: 22px; max-width: 420px; width: 100%; display: grid; gap: 10px; text-align: center; box-shadow: 0 0 60px color-mix(in srgb, var(--ideo) 55%, transparent); animation: popIn .45s cubic-bezier(.2,1.4,.4,1); }
+.unlock-box h2 { color: var(--ideo); filter: brightness(1.35); }
+.unlock-who { color: var(--muted); }
+@keyframes popIn { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .unlock-overlay, .unlock-box { animation: none; } }
+
+/* ---------- Jumla card ---------- */
+.jumla-panel { margin-bottom: 16px; }
+.jumla-mini { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: #f1ead6; color: #111; font-size: .62rem; font-weight: 800; }
+.ideo-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.jcard { background: #f1ede0 ; color: #333; border-radius: 14px; overflow: hidden; display: grid; gap: 10px; justify-items: center; text-align: center; padding: 16px 16px 0; border-left: 12px solid #111; border-right: 12px solid #111; max-width: 380px; margin: 0 auto; width: 100%; }
+.jcard .j-plaque { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; padding: 8px 34px; background: #fff; border: 2px solid #111; clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); }
+.jcard .j-quote { font-family: var(--font-display); text-transform: uppercase; font-weight: 600; color: #111; font-size: .95rem; line-height: 1.25; }
+.jcard .j-text { font-size: .88rem; line-height: 1.4; color: #444; }
+.jcard .j-band { justify-self: stretch; margin: 4px -16px 0; padding: 8px; background: var(--ideo); color: #fff; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: .8rem; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.jcard.small { flex: 0 0 min(250px, 80%); scroll-snap-align: start; padding-top: 12px; border-width: 8px; }
+.jcard.small .j-quote { font-size: .8rem; }
+.jumla-req { position: sticky; top: 0; z-index: 8; background: #2a2412; border: 1px solid var(--brass); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: grid; gap: 8px; }
