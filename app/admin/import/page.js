@@ -14,7 +14,7 @@ export default function ImportPage() {
 }
 
 const COLUMNS = [
-  'number', 'question',
+  'number', 'question', 'sensitive',
   'yes_ideology', 'yes_card_text', 'yes_resources', 'yes_recipient',
   'no_ideology', 'no_card_text', 'no_resources', 'no_recipient',
 ];
@@ -65,7 +65,7 @@ function Importer() {
     const b = names[1] || a;
     const lines = [
       COLUMNS.join(','),
-      `1,"Should the city build a new park?",${a},"The park opens to cheers.","2 Funds",answerer,${b},"Citizens grumble.","",answerer`,
+      `1,"Should the city build a new park?",no,${a},"The park opens to cheers.","2 Funds",answerer,${b},"Citizens grumble.","",answerer`,
     ];
     const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
     const link = document.createElement('a');
@@ -93,7 +93,7 @@ function Importer() {
       const line = n + 2;
       const text = get('question');
       if (!text) return probs.push(`Row ${line}: the question is empty.`);
-      const out = { number: Number(get('number')) || n + 1, text };
+      const out = { number: Number(get('number')) || n + 1, text, sensitive: /^(1|yes|true|y|sensitive)$/i.test(get('sensitive')) };
       for (const side of ['yes', 'no']) {
         const ideo = get(`${side}_ideology`);
         const id = byName.get(ideo.toLowerCase());
@@ -138,7 +138,7 @@ function Importer() {
         <div className="row"><button className="btn" onClick={downloadTemplate}>Download template (CSV)</button></div>
         <p className="muted small">
           Columns: {COLUMNS.join(', ')}. Ideology must match an existing ideology type name exactly (see Ideology types).
-          Recipient is answerer (default), next or previous. Card text and resources are optional.
+          Recipient is answerer (default), next or previous. Sensitive is yes or no (yes shows the red !! badge). Card text and resources are optional.
         </p>
         <label className="field"><span>Deck name</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={onFile} /></label>

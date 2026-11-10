@@ -15,7 +15,7 @@ export default function DeckEditorPage() {
 }
 
 const QUESTION_FIELDS = [
-  'number', 'text',
+  'number', 'text', 'sensitive',
   'yes_label', 'yes_ideology_id', 'yes_card_text', 'yes_resources', 'yes_recipient',
   'no_label', 'no_ideology_id', 'no_card_text', 'no_resources', 'no_recipient',
 ];
@@ -84,7 +84,7 @@ function DeckEditor() {
     setQuestions((qs) => [
       ...qs,
       {
-        _key: crypto.randomUUID(), _new: true, number: maxNo + 1, text: '',
+        _key: crypto.randomUUID(), _new: true, number: maxNo + 1, text: '', sensitive: false,
         yes_label: 'Yes', yes_ideology_id: '', yes_card_text: '', yes_resources: '', yes_recipient: 'answerer',
         no_label: 'No', no_ideology_id: '', no_card_text: '', no_resources: '', no_recipient: 'answerer',
       },
@@ -203,6 +203,10 @@ function DeckEditor() {
             </label>
             <button className="btn sm danger" onClick={() => removeQuestion(idx)}>Delete</button>
           </div>
+          <label className="row small">
+            <input type="checkbox" style={{ width: 20, minHeight: 20 }} checked={!!q.sensitive} onChange={(e) => setQ(idx, 'sensitive', e.target.checked)} />
+            Sensitive topic (shows the red !! badge)
+          </label>
           <label className="field">
             <span>Question text</span>
             <textarea value={q.text} onChange={(e) => setQ(idx, 'text', e.target.value)} placeholder="e.g. Should the government…?" />
@@ -225,7 +229,7 @@ function DeckEditor() {
                   </select>
                 </label>
                 <label className="field">
-                  <span>Card text revealed (optional)</span>
+                  <span>Answer text read aloud, e.g. “Yes. Democracy is not a game.” (optional)</span>
                   <textarea value={q[`${side}_card_text`]} onChange={(e) => setQ(idx, `${side}_card_text`, e.target.value)} />
                 </label>
                 <label className="field">

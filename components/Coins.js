@@ -64,17 +64,42 @@ export function Resources({ text, size = 26 }) {
   );
 }
 
-// A copy of the physical ideology card.
+// The printed ideology card. Pass `ideology` ({name,color,symbol}) to reveal it; leave it out to keep it sealed.
+export function PCard({ question, number, sensitive, children, ideology, coins, small, flip }) {
+  return (
+    <div className={`pcard ${small ? 'small' : ''} ${ideology ? '' : 'sealed'} ${flip ? 'flip' : ''}`} style={{ '--ideo': ideology?.color }}>
+      <div className="pc-top">
+        <div className="pc-top-in">
+          {sensitive ? <span className="pc-sens" title="Sensitive topic" aria-label="Sensitive topic"><i>!!</i></span> : null}
+          {number ? <span className="pc-no">No. {number}</span> : null}
+          <p>{question}</p>
+        </div>
+        <span className="pc-notch" />
+      </div>
+      <div className="pc-body">
+        {children}
+        {ideology && coins ? <Resources text={coins} size={small ? 26 : 40} /> : null}
+      </div>
+      <div className="pc-band">
+        <div className="pc-plaque"><div className="pc-plaque-in">{ideology ? ideology.name : '?'}</div></div>
+      </div>
+    </div>
+  );
+}
+
+// A revealed card built from a stored turn snapshot.
 export function CardFace({ card, number, small }) {
   const c = card || {};
   return (
-    <div className={`pcard ${small ? 'small' : ''}`} style={{ '--ideo': c.ideology_color }}>
-      <div className="pcard-q">{number ? <span className="pcard-no">{number}</span> : null}{c.question}</div>
-      <div className="pcard-body">
-        <p>{c.card_text || c.ideology_description || ''}</p>
-        <Resources text={c.resources} size={small ? 22 : 28} />
-      </div>
-      <div className="pcard-foot"><span>{c.ideology_symbol}</span> {c.ideology_name}</div>
-    </div>
+    <PCard
+      small={small}
+      number={number}
+      question={c.question}
+      sensitive={c.sensitive}
+      ideology={{ name: c.ideology_name, color: c.ideology_color, symbol: c.ideology_symbol }}
+      coins={c.resources}
+    >
+      <p className="pc-text">{c.card_text || c.label || ''}</p>
+    </PCard>
   );
 }

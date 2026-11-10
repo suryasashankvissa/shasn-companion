@@ -371,6 +371,9 @@ end $$;
 revoke all on function end_game(text,text,uuid) from public, anon, authenticated;
 grant execute on function end_game(text,text,uuid) to service_role;
 
+-- ---------- Sensitive-topic marker ----------
+alter table questions add column if not exists sensitive boolean not null default false;
+
 -- =====================================================================
 -- Starter content: the four base ideologues and an original sample deck
 -- so you can try the app straight away. Safe to re-run.

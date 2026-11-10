@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getToken, hasToken, supabase, rememberGame } from '@/lib/client';
 import DeckSwatch from '@/components/DeckSwatch';
-import { CardFace, Resources } from '@/components/Coins';
+import { CardFace, PCard } from '@/components/Coins';
 
 export default function GamePage() {
   const { code: rawCode } = useParams();
@@ -293,12 +293,12 @@ function Gameplay({ state, act, live }) {
           )}
 
           {answered ? (
-            <IdeologyCard key={`r-${state.questionSeq}`} result={state.result} playerById={playerById} meId={state.me.id} />
+            <p className="ideo-award">
+              Awarded to <strong>{playerById[state.result.recipientId]?.id === state.me.id ? 'you' : playerById[state.result.recipientId]?.name}</strong>
+              {state.result.recipientId !== state.result.answererId && <> (answered by {playerById[state.result.answererId]?.name})</>}
+            </p>
           ) : (
-            <div className="hidden-card">
-              <div className="display">?</div>
-              <p className="small">The ideology stays sealed until {isMyTurn ? 'you answer' : `${active?.name} answers`}.</p>
-            </div>
+            <p className="hidden-hint">The ideology stays sealed until {isMyTurn ? 'you answer' : `${active?.name} answers`}.</p>
           )}
 
           {state.me.isHost && (
@@ -455,57 +455,43 @@ function TurnStrip({ players, activeId, meId }) {
   );
 }
 
+// One card for the whole turn: the question and both answers (read aloud) first; once answered, the
+// chosen answer, its coins and the ideology band are revealed on the very same card.
 function QuestionCard({ question, result, canAnswer, pending, onChoose }) {
-  const chosen = result?.choice || null;
-  const color = result?.card?.ideology_color;
-  const opt = (key, label) => {
-    const isChosen = chosen === key;
-    const cls = ['answer', canAnswer ? 'can' : '', isChosen ? 'chosen' : '', chosen && !isChosen ? 'not-chosen' : '', pending === key ? 'pending' : '']
-      .filter(Boolean)
-      .join(' ');
+  const strip = (t, k) => String(t || '').replace(new RegExp(`^\\s*${k}\\s*[.:\\-–—]\\s*`, 'i'), '');
+  if (result) {
+    const c = result.card || {};
     return (
-      <button
-        className={cls}
-        disabled={!canAnswer}
-        aria-disabled={!canAnswer}
-        onClick={() => onChoose(key)}
-        style={isChosen ? { '--ideo': color } : undefined}
+      <PCard
+        flip
+        question={question.text}
+        number={question.number}
+        sensitive={question.sensitive}
+        ideology={{ name: c.ideology_name, color: c.ideology_color, symbol: c.ideology_symbol }}
+        coins={c.resources}
       >
-        <span className="a-key">{key === 'yes' ? 'YES' : 'NO'}</span>
-        {label && label.toLowerCase() !== key && <span className="a-label">{label}</span>}
-      </button>
+        <p className="pc-text">{c.card_text || c.label || (result.choice === 'yes' ? 'Yes.' : 'No.')}</p>
+      </PCard>
     );
-  };
-  return (
-    <article className="q-card">
-      <div className="q-meta">
-        <span>Campaign Question</span>
-        {question.number ? <span>No. {question.number}</span> : null}
-      </div>
-      <p className="q-text">{question.text}</p>
-      <div className="answers">
-        {opt('yes', question.yesLabel)}
-        {opt('no', question.noLabel)}
-      </div>
-    </article>
+  }
+  const opt = (key, label, text) => (
+    <button
+      className={`pc-opt ${canAnswer ? 'can' : ''} ${pending === key ? 'pending' : ''}`}
+      disabled={!canAnswer}
+      aria-disabled={!canAnswer}
+      onClick={() => onChoose(key)}
+    >
+      <span className="a-key">{key === 'yes' ? 'YES' : 'NO'}</span>
+      <span className="a-text">{strip(text, key) || (label && label.toLowerCase() !== key ? label : '')}</span>
+    </button>
   );
-}
-
-function IdeologyCard({ result, playerById, meId }) {
-  const c = result.card || {};
-  const recipient = playerById[result.recipientId];
-  const answerer = playerById[result.answererId];
   return (
-    <div className="reveal-wrap">
-      <p className="eyebrow center" style={{ marginBottom: 8 }}>Ideology revealed</p>
-      <div className="flip">
-        <CardFace card={c} />
+    <PCard question={question.text} number={question.number} sensitive={question.sensitive}>
+      <div className="pc-answers">
+        {opt('yes', question.yesLabel, question.yesText)}
+        {opt('no', question.noLabel, question.noText)}
       </div>
-      <p className="ideo-award">
-        Awarded to <strong>{recipient?.id === meId ? 'you' : recipient?.name}</strong>
-        {recipient?.id !== answerer?.id && <> (answered by {answerer?.name})</>}
-      </p>
-    </div>
+    </PCard>
   );
 }
 
